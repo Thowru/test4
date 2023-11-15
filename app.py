@@ -40,7 +40,8 @@ def visualize_clusters_2d(df, x_col, y_col, hue_col, title):
     plt.xlabel(x_col)
     plt.ylabel(y_col)
     plt.title(title)
-    plt.show()
+    plt.colorbar(label='클러스터')
+    st.pyplot()
 
 # Streamlit 앱 함수
 def main():
