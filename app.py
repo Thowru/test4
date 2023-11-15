@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import base64
 
 def feature_extract(df):
     df['method_cnt'] = 0.0
@@ -94,12 +95,10 @@ def main():
         st.write("전처리된 데이터:")
         st.write(df_entity_processed)
 
-        # CSV 파일 다운로드 링크 생성
+        # CSV 파일 다운로드 버튼 생성
         csv_file = df_entity_processed.to_csv(index=False).encode()
         b64 = base64.b64encode(csv_file).decode()
-        href = f'<a href="data:file/csv;base64,{b64}" download="preprocessed_data.csv">Download CSV 파일</a>'
-        st.markdown(href, unsafe_allow_html=True)
+        st.button("Download CSV 파일", on_click=lambda: st.markdown(f'<a href="data:file/csv;base64,{b64}" download="preprocessed_data.csv">Download CSV 파일</a>', unsafe_allow_html=True))
 
-        
 if __name__ == '__main__':
     main()
