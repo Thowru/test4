@@ -1,104 +1,67 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import base64
+import joblib
+from datetime import datetime
+import seaborn as sns
+import matplotlib.pyplot as plt
+import platform
+from matplotlib import font_manager, rc
+from sklearn import preprocessing
+from sklearn.cluster import KMeans, DBSCAN
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.manifold import TSNE
+from process_log import process_log_data 
+from feature_extraction import feature_extract
+from feature_extraction import feature_extract2
 
-def feature_extract(df):
-    df['method_cnt'] = 0.0
-    df['method_post'] = 0.0
-    df['protocol_1_0'] = False
-    df['status_major'] = 0.0
-    df['status_404'] = 0.0
-    df['status_499'] = False
-    df['status_cnt'] = 0.0
-    df['path_same'] = 0.0
-    df['path_xmlrpc'] = True
-    df['ua_cnt'] = 0.0
-    df['has_payload'] = False
-    df['bytes_avg'] = 0.0
-    df['bytes_std'] = 0.0
-
-    cnt = 0
-    for entity in df['Host'].unique():
-        if cnt % 500 == 0:
-            print(cnt)
-
-        group = df[df['Host'] == entity]
-
-        method_cnt = group['Method'].nunique()
-        df.loc[df['Host'] == entity, 'method_cnt'] = method_cnt
-
-        method_post_percent = len(group[group['Method'] == 'POST']) / max(1, len(group))
-        df.loc[df['Host'] == entity, 'method_post'] = method_post_percent
-
-        use_1_0 = any(group['Protocol'] == 'HTTP/1.0')
-        df.loc[df['Host'] == entity, 'protocol_1_0'] = use_1_0
-
-        status_major_percent = len(group[group['Status'].isin(['200', '301', '302'])]) / max(1, len(group))
-        df.loc[df['Host'] == entity, 'status_major'] = status_major_percent
-
-        status_404_percent = len(group[group['Status'] == '404']) / max(1, len(group))
-        df.loc[df['Host'] == entity, 'status_404'] = status_404_percent
-
-        has_499 = any(group['Status'] == '499')
-        df.loc[df['Host'] == entity, 'status_499'] = has_499
-
-        status_cnt = group['Status'].nunique()
-        df.loc[df['Host'] == entity, 'status_cnt'] = status_cnt
-
-        top1_path_cnt = group['Path'].value_counts().iloc[0] if not group['Path'].value_counts().empty else 0
-        path_same = top1_path_cnt / max(1, len(group))
-        df.loc[df['Host'] == entity, 'path_same'] = path_same
-
-        path_xmlrpc = len(group[group['Path'].str.contains('xmlrpc.php') == True]) / max(1, len(group))
-        df.loc[df['Host'] == entity, 'path_xmlrpc'] = path_xmlrpc
-
-        ua_cnt = group['UA'].nunique()
-        df.loc[df['Host'] == entity, 'ua_cnt'] = ua_cnt
-
-        has_payload = any(group['Payload'] != '-')
-        df.loc[df['Host'] == entity, 'has_payload'] = has_payload
-
-        bytes_avg = np.mean(group['Bytes'])
-        bytes_std = np.std(group['Bytes'])
-        df.loc[df['Host'] == entity, 'bytes_avg'] = bytes_avg
-        df.loc[df['Host'] == entity, 'bytes_std'] = bytes_std
-
-        cnt += 1
-    return df
+rc('font', family='NanumGothic')
 
 def main():
-    st.title('로그 데이터 처리 앱')
+    st.title('colab 코드 띄우기')
 
     # 파일 업로드
     uploaded_csvfile = st.file_uploader("CSV 파일 선택", type="csv")
 
     if uploaded_csvfile is not None:
-        # CSV 파일 읽기
-        df_entity = pd.read_csv(uploaded_csvfile)
+        # 업로드된 파일 읽기
+        df_entity = pd.read_csv(uploaded_csvfile, index_col='entity')
 
-        # Feature Extraction
-        df_entity_processed = feature_extract(df_entity)
+        # 나머지 코드 실행
+        columns_to_scale = ['method_cnt', 'status_cnt', 'ua_cnt', 'bytes_avg', 'bytes_std']
+        scaler = preprocessing.MinMaxScaler()
+        scaler = scaler.fit(df_entity[columns_to_scale])
+        df_entity[columns_to_scale] = scaler.transform(df_entity[columns_to_scale])
 
-        # host 컬럼을 entity로 변경
-        df_entity_processed = df_entity_processed.rename(columns={'Host': 'entity'})
+        cols_to_train = ['method_cnt','method_post','protocol_1_0','status_major','status_404','status_499','status_cnt','path_same','path_xmlrpc','ua_cnt','has_payload','bytes_avg','bytes_std']
+        kmeans = KMeans(n_clusters=2, random_state=42)
+        
+        # 정상/ 비정상 클러스터로 나누어 보기
+        kmeans.fit(df_entity[cols_to_train])
 
-        # 불필요한 컬럼 제거
-        columns_to_drop = ['Unnamed: 0', 'Timestamp', 'Method', 'Protocol', 'Status', 'Referer', 'Path', 'UA', 'Payload', 'Bytes']
-        df_entity_processed = df_entity_processed.drop(columns=columns_to_drop, errors='ignore')
+        df_entity['cluster_kmeans'] = kmeans.predict(df_entity[cols_to_train])
 
-        # 'entity' 컬럼을 맨 앞으로 이동
-        columns_order = ['entity'] + [col for col in df_entity_processed.columns if col != 'entity']
-        df_entity_processed = df_entity_processed[columns_order]
+        st.write(df_entity['cluster_kmeans'].value_counts())
+        st.write(df_entity[df_entity['cluster_kmeans']==0].index)
 
-        # 전처리된 데이터 출력
-        st.write("전처리된 데이터:")
-        st.write(df_entity_processed)
+        # PCA를 사용하여 데이터의 차원을 2로 축소
+        pca = PCA(n_components=2)
+        pca_result = pca.fit_transform(df_entity[cols_to_train])
 
-        # CSV 파일 다운로드 버튼 생성
-        csv_file = df_entity_processed.to_csv(index=False).encode()
-        b64 = base64.b64encode(csv_file).decode()
-        st.button("Download CSV 파일", on_click=lambda: st.markdown(f'<a href="data:file/csv;base64,{b64}" download="preprocessed_data.csv">Download CSV 파일</a>', unsafe_allow_html=True))
+        # PCA 결과를 데이터프레임에 추가
+        df_entity['pca_1'] = pca_result[:, 0]
+        df_entity['pca_2'] = pca_result[:, 1]
+
+        # 2D PCA 결과를 시각화
+        fig = plt.figure(figsize=(10, 6))
+        plt.scatter(df_entity['pca_1'], df_entity['pca_2'], c=df_entity['cluster_kmeans'], cmap='viridis', s=60)
+        plt.xlabel("PCA 1")
+        plt.ylabel("PCA 2")
+        plt.title("전체 Feature를 이용한 이상탐지된 Entity 시각화 (PCA 결과)")
+        plt.colorbar(label='클러스터')
+
+        st.pyplot(fig)
 
 if __name__ == '__main__':
     main()
