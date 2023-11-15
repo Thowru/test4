@@ -82,12 +82,17 @@ def main():
         # host 컬럼을 entity로 변경
         df_entity_processed = df_entity_processed.rename(columns={'Host': 'entity'})
 
-        # 전체 컬럼 선택
-        selected_cols = df_entity_processed.columns
+        # 불필요한 컬럼 제거
+        columns_to_drop = ['Unnamed: 0', 'Timestamp', 'Method', 'Protocol', 'Status', 'Referer', 'Path', 'UA', 'Payload', 'Bytes']
+        df_entity_processed = df_entity_processed.drop(columns=columns_to_drop, errors='ignore')
+
+        # 'entity' 컬럼을 맨 앞으로 이동
+        columns_order = ['entity'] + [col for col in df_entity_processed.columns if col != 'entity']
+        df_entity_processed = df_entity_processed[columns_order]
 
         # 전처리된 데이터 출력
         st.write("전처리된 데이터:")
-        st.write(df_entity_processed[selected_cols])
+        st.write(df_entity_processed)
 
 if __name__ == '__main__':
     main()
