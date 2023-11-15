@@ -2,108 +2,109 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-import seaborn as sns
-import pickle
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.manifold import TSNE
 
-# Load Data Function
-def load_data():
-    # 파일 업로드
-    uploaded_file = st.file_uploader("CSV 파일 선택", type=["csv"])
+# Function to perform K-means clustering
+def perform_kmeans(data, n_clusters=2):
+    kmeans_model = KMeans(n_clusters=n_clusters, random_state=42)
+    data['cluster_kmeans'] = kmeans_model.fit_predict(data)
+    return data, kmeans_model
 
-    # 파일이 업로드되었을 때의 처리
-    if uploaded_file is not None:
-        # 업로드한 파일을 Pandas DataFrame으로 읽어오기
-        df_entity = pd.read_csv(uploaded_file)
-        return df_entity
-    else:
-        return None
+# Function to perform DBSCAN clustering
+def perform_dbscan(data, eps=0.5, min_samples=2):
+    dbscan_model = DBSCAN(eps=eps, min_samples=min_samples)
+    data['cluster_dbscan'] = dbscan_model.fit_predict(data)
+    return data, dbscan_model
 
-# K-means 클러스터링 함수
-def kmeans_clustering(df, cols_to_train, n_clusters=2):
-    scaler = StandardScaler()
-    df_scaled = scaler.fit_transform(df[cols_to_train])
-
-    model = KMeans(n_clusters=n_clusters, random_state=42)
-    model.fit(df_scaled)
-
-    df['cluster_kmeans'] = model.labels_
-
-    return df, model
-
-# DBSCAN 클러스터링 함수
-def dbscan_clustering(df, cols_to_train, eps=0.5, min_samples=5):
-    scaler = StandardScaler()
-    df_scaled = scaler.fit_transform(df[cols_to_train])
-
-    model = DBSCAN(eps=eps, min_samples=min_samples)
-    df['cluster_dbscan'] = model.fit_predict(df_scaled)
-
-    return df, model
-
-# 시각화 함수
-def visualize_clusters_2d(df, x_col, y_col, hue_col, title):
+# Function to visualize 2D clusters
+def visualize_clusters_2d(data, x_col, y_col, hue_col, title):
     plt.figure(figsize=(10, 6))
-    sns.scatterplot(x=x_col, y=y_col, data=df, hue=hue_col, palette='viridis', s=60)
+    scatter = sns.scatterplot(x=x_col, y=y_col, data=data, hue=hue_col, palette='viridis', s=60)
     plt.xlabel(x_col)
     plt.ylabel(y_col)
     plt.title(title)
-    plt.colorbar(label='클러스터')
+
+    # Extract the mappable from the scatter plot
+    handles, labels = scatter.get_legend_handles_labels()
+    mappable = handles[0]
+
+    # Add colorbar using the mappable
+    plt.colorbar(mappable, label='클러스터')
+
     st.pyplot()
 
-# Streamlit 앱 함수
+# Function to visualize 2D PCA clusters
+def visualize_pca_clusters(data, x_col, y_col, hue_col, title):
+    pca = PCA(n_components=2)
+    pca_result = pca.fit_transform(data[cols_to_train])
+
+    data['pca_1'] = pca_result[:, 0]
+    data['pca_2'] = pca_result[:, 1]
+
+    visualize_clusters_2d(data, 'pca_1', 'pca_2', hue_col, title)
+
+# Function to visualize 2D TSNE clusters
+def visualize_tsne_clusters(data, x_col, y_col, hue_col, title):
+    tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=500, random_state=42)
+    tsne_results = tsne.fit_transform(data[cols_to_train])
+
+    data['tsne-2d-one'] = tsne_results[:, 0]
+    data['tsne-2d-two'] = tsne_results[:, 1]
+
+    visualize_clusters_2d(data, 'tsne-2d-one', 'tsne-2d-two', hue_col, title)
+
+# Streamlit app
 def main():
-    st.title('이상 탐지 결과 시각화')
+    st.title("Clustering Analysis with Streamlit")
 
-    # 데이터 로드
-    df_entity = load_data()
+    # File Upload
+    st.sidebar.header("Upload CSV File")
+    uploaded_file = st.sidebar.file_uploader("Choose a CSV file", type="csv")
 
-    if df_entity is not None:
-        # 클러스터링을 위한 feature 선택
-        cols_to_train = ['method_cnt', 'method_post', 'protocol_1_0', 'status_major', 'status_404', 'status_499', 'status_cnt', 'path_same', 'ua_cnt', 'has_payload', 'bytes_avg', 'bytes_std']
+    # K-means parameters
+    n_clusters = st.sidebar.slider("Number of K-means clusters", 2, 10, 2)
 
-        # K-means 클러스터링 수행
-        df_entity, kmeans_model = kmeans_clustering(df_entity, cols_to_train)
+    # DBSCAN parameters
+    eps = st.sidebar.slider("DBSCAN Epsilon", 0.1, 2.0, 0.5)
+    min_samples = st.sidebar.slider("DBSCAN Minimum Samples", 1, 10, 2)
 
-        # K-means 클러스터 시각화
-        visualize_clusters_2d(df_entity, 'method_post', 'status_404', 'cluster_kmeans', 'K-means 클러스터링 결과')
+    if uploaded_file is not None:
+        # Read CSV file
+        df = pd.read_csv(uploaded_file)
 
-        # DBSCAN 클러스터링 수행
-        df_entity, dbscan_model = dbscan_clustering(df_entity, cols_to_train)
+        # Display the DataFrame
+        st.subheader("Data Preview")
+        st.dataframe(df)
 
-        # DBSCAN 클러스터 시각화
-        visualize_clusters_2d(df_entity, 'method_post', 'status_404', 'cluster_dbscan', 'DBSCAN 클러스터링 결과')
+        # K-means clustering
+        st.subheader("K-means Clustering")
+        df, kmeans_model = perform_kmeans(df, n_clusters)
+        st.write("K-means clustering results:")
+        st.write("Cluster Centers:", kmeans_model.cluster_centers_)
+        st.write("Cluster Labels:", df['cluster_kmeans'].value_counts())
 
-        # 클러스터별 데이터 포인트 수 출력
-        st.write("K-means 클러스터의 데이터 포인트 수:")
-        st.write(df_entity['cluster_kmeans'].value_counts())
+        # DBSCAN clustering
+        st.subheader("DBSCAN Clustering")
+        df, dbscan_model = perform_dbscan(df, eps, min_samples)
+        st.write("DBSCAN clustering results:")
+        st.write("Core sample indices:", dbscan_model.core_sample_indices_)
+        st.write("Cluster Labels:", df['cluster_dbscan'].value_counts())
 
-        st.write("DBSCAN 클러스터의 데이터 포인트 수:")
-        st.write(df_entity['cluster_dbscan'].value_counts())
+        # Visualize 2D clusters
+        st.subheader("Visualize Clusters (2D)")
+        visualize_clusters_2d(df, 'method_post', 'status_404', 'cluster_kmeans', 'K-means Clustering Results')
 
-        # K-means 이상 탐지된 Host 출력
-        st.write("K-means 이상 탐지된 Host:")
-        st.write(df_entity[df_entity['cluster_kmeans'] == -1]['Host'])
+        # Visualize 2D PCA clusters
+        st.subheader("Visualize PCA Clusters (2D)")
+        visualize_pca_clusters(df, 'method_post', 'status_404', 'cluster_kmeans', 'PCA Clustering Results')
 
-        # DBSCAN 이상 탐지된 Host 출력
-        st.write("DBSCAN 이상 탐지된 Host:")
-        st.write(df_entity[df_entity['cluster_dbscan'] == -1]['Host'])
+        # Visualize 2D TSNE clusters
+        st.subheader("Visualize TSNE Clusters (2D)")
+        visualize_tsne_clusters(df, 'method_post', 'status_404', 'cluster_kmeans', 'TSNE Clustering Results')
 
-        # 클러스터링 결과를 기반으로 이상탐지된 클러스터에 속하는 entity 추출 (DBSCAN)
-        anomaly_entities_dbscan = df_entity[df_entity['cluster_dbscan'] != 0].index
-
-        # 추출한 entity를 pickle 파일로 저장
-        with open('anomaly_entities_dbscan.pkl', 'wb') as f:
-            pickle.dump(anomaly_entities_dbscan, f)
-
-        # 클러스터링 결과에서 이상탐지된 클러스터에 속하는 entity 추출 (K-means)
-        anomaly_entities_kmeans = df_entity[df_entity['cluster_kmeans'] == 0].index
-
-        # 추출한 entity를 pickle 파일로 저장
-        with open('anomaly_entities_kmeans.pkl', 'wb') as f:
-            pickle.dump(anomaly_entities_kmeans, f)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
