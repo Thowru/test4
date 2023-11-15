@@ -2,7 +2,6 @@
 
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans, DBSCAN
@@ -32,8 +31,8 @@ def visualize_outliers(df, x_col, y_col, hue_col, title):
     plt.xlabel(x_col)
     plt.ylabel(y_col)
     plt.title(title)
-    plt.colorbar(label='클러스터')
-    st.pyplot()
+    plt.legend()
+    plt.show()  # streamlit에서는 st.pyplot()를 사용하지 않고 plt.show()로 그림을 보여줍니다.
 
 # Streamlit 앱 함수
 def main():
