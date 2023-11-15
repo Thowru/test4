@@ -37,29 +37,9 @@ def visualize_clusters_2d(data, x_col, y_col, hue_col, title):
 
     st.pyplot()
 
-# Function to visualize 2D PCA clusters
-def visualize_pca_clusters(data, x_col, y_col, hue_col, title):
-    pca = PCA(n_components=2)
-    pca_result = pca.fit_transform(data[cols_to_train])
-
-    data['pca_1'] = pca_result[:, 0]
-    data['pca_2'] = pca_result[:, 1]
-
-    visualize_clusters_2d(data, 'pca_1', 'pca_2', hue_col, title)
-
-# Function to visualize 2D TSNE clusters
-def visualize_tsne_clusters(data, x_col, y_col, hue_col, title):
-    tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=500, random_state=42)
-    tsne_results = tsne.fit_transform(data[cols_to_train])
-
-    data['tsne-2d-one'] = tsne_results[:, 0]
-    data['tsne-2d-two'] = tsne_results[:, 1]
-
-    visualize_clusters_2d(data, 'tsne-2d-one', 'tsne-2d-two', hue_col, title)
-
 # Streamlit app
 def main():
-    st.title("Clustering Analysis with Streamlit")
+    st.title("Anomaly Detection with Streamlit")
 
     # File Upload
     st.sidebar.header("Upload CSV File")
@@ -98,13 +78,25 @@ def main():
         st.subheader("Visualize Clusters (2D)")
         visualize_clusters_2d(df, 'method_post', 'status_404', 'cluster_kmeans', 'K-means Clustering Results')
 
-        # Visualize 2D PCA clusters
-        st.subheader("Visualize PCA Clusters (2D)")
-        visualize_pca_clusters(df, 'method_post', 'status_404', 'cluster_kmeans', 'PCA Clustering Results')
+        # Visualize anomalies
+        st.subheader("Visualize Anomalies")
+        anomaly_hosts_kmeans = df[df['cluster_kmeans'] == 0].index
+        anomaly_hosts_dbscan = df[df['cluster_dbscan'] != 0].index
+        anomaly_hosts_intersection = anomaly_hosts_kmeans.intersection(anomaly_hosts_dbscan)
 
-        # Visualize 2D TSNE clusters
-        st.subheader("Visualize TSNE Clusters (2D)")
-        visualize_tsne_clusters(df, 'method_post', 'status_404', 'cluster_kmeans', 'TSNE Clustering Results')
+        plt.figure(figsize=(10, 6))
+        plt.scatter(df['method_post'], df['status_404'], c='blue', label='Normal')
+        plt.scatter(df.loc[anomaly_hosts_intersection, 'method_post'], df.loc[anomaly_hosts_intersection, 'status_404'], c='red', label='Anomalies')
+        plt.xlabel('method_post')
+        plt.ylabel('status_404')
+        plt.legend()
+        plt.title('Anomalies Visualization')
+        st.pyplot()
+
+        # Display anomaly entities
+        st.subheader("Anomaly Entities")
+        anomaly_entities_df = df.loc[anomaly_hosts_intersection, ['method_cnt', 'method_post', 'protocol_1_0', 'status_major', 'status_404', 'status_499', 'status_cnt', 'path_same', 'path_xmlrpc', 'ua_cnt', 'has_payload', 'bytes_avg', 'bytes_std']]
+        st.dataframe(anomaly_entities_df)
 
 if __name__ == "__main__":
     main()
