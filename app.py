@@ -79,16 +79,15 @@ def main():
         # Feature Extraction
         df_entity_processed = feature_extract(df_entity)
 
-        # 필요한 열 선택 및 이름 변경
-        selected_cols = ['entity', 'method_cnt', 'method_post', 'protocol_1_0', 'status_major', 'status_404', 'status_499', 'status_cnt', 'path_same', 'path_xmlrpc', 'ua_cnt', 'has_payload', 'bytes_avg', 'bytes_std']
-        df_entity_processed = df_entity_processed[selected_cols]
-
         # host 컬럼을 entity로 변경
         df_entity_processed = df_entity_processed.rename(columns={'Host': 'entity'})
 
+        # 전체 컬럼 선택
+        selected_cols = df_entity_processed.columns
+
         # 전처리된 데이터 출력
         st.write("전처리된 데이터:")
-        st.write(df_entity_processed)
+        st.write(df_entity_processed[selected_cols])
 
 if __name__ == '__main__':
     main()
