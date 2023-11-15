@@ -36,12 +36,17 @@ def apply_tsne(df, cols_to_train):
 # 시각화 함수
 def visualize_clusters_2d(df, x_col, y_col, hue_col, title):
     plt.figure(figsize=(10, 6))
-    sns.scatterplot(x=x_col, y=y_col, data=df, hue=hue_col, palette='viridis', s=60)
-    plt.xlabel(x_col)
-    plt.ylabel(y_col)
-    plt.title(title)
-    plt.colorbar(label='클러스터')
-    st.pyplot()
+    
+    try:
+        sns.scatterplot(x=x_col, y=y_col, data=df, hue=hue_col, palette='viridis', s=60)
+        plt.xlabel(x_col)
+        plt.ylabel(y_col)
+        plt.title(title)
+        plt.colorbar(label='클러스터')
+        st.pyplot()
+    except ValueError as e:
+        st.error(f"시각화 중 오류 발생: {e}")
+        st.write(f"{hue_col} 컬럼에 유효한 값이 있는지 확인하세요.")
 
 # Streamlit 앱 함수
 def main():
