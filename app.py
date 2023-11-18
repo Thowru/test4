@@ -82,7 +82,9 @@ def main():
         search_entity = st.text_input("검색할 Entity 입력:")
         if search_entity:
             st.write("검색 결과:")
-            if search_entity in cluster_0_entities:
+            if search_entity in cluster_0_entities and search_entity in cluster_not_0_entities:
+                st.write(f"{search_entity}은(는) KMeans 클러스터 0과 DBSCAN 클러스터 0을 제외한 클러스터에 모두 속해 있습니다.")
+            elif search_entity in cluster_0_entities:
                 st.write(f"{search_entity}은(는) KMeans 클러스터 0에 속해 있습니다.")
             elif search_entity in cluster_not_0_entities:
                 st.write(f"{search_entity}은(는) DBSCAN 클러스터 0을 제외한 클러스터에 속해 있습니다.")
